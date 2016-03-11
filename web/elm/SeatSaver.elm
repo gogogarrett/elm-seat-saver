@@ -13,13 +13,14 @@ app =
     { init = init
     , update = update
     , view = view
-    , inputs = []
+    , inputs = [incomingActions]
     }
 
 main : Signal Html
 main =
   app.html
 
+-- is this not needed..?
 port tasks : Signal (Task Never ())
 port tasks =
   app.tasks
@@ -36,28 +37,11 @@ type alias Model =
 
 init : (Model, Effects Action)
 init =
-  let
-    seats =
-      [ { seatNo = 1, occupied = False }
-      , { seatNo = 2, occupied = False }
-      , { seatNo = 3, occupied = False }
-      , { seatNo = 4, occupied = False }
-      , { seatNo = 5, occupied = False }
-      , { seatNo = 6, occupied = False }
-      , { seatNo = 7, occupied = False }
-      , { seatNo = 8, occupied = False }
-      , { seatNo = 9, occupied = False }
-      , { seatNo = 10, occupied = False }
-      , { seatNo = 11, occupied = False }
-      , { seatNo = 12, occupied = False }
-      ]
-  in
-    (seats, Effects.none)
-
+  ([], Effects.none)
 
 -- UPDATE
 
-type Action = Toggle Seat
+type Action = Toggle Seat | SetSeats Model | RequestSeat Seat | NoOp
 
 update : Action -> Model -> (Model, Effects Action)
 update action model =
@@ -66,11 +50,45 @@ update action model =
       let
         updateSeat seatFromModel =
           if seatFromModel.seatNo == seatToToggle.seatNo then
-            { seatFromModel | occupied = not seatFromModel.occupied }
+            { seatFromModel | occupied = not seatToToggle.occupied }
           else seatFromModel
       in
         (List.map updateSeat model, Effects.none)
+    SetSeats seats ->
+      (seats, Effects.none)
+    RequestSeat seat ->
+      (model, sendSeatRequest seat)
+    NoOp ->
+      (model, Effects.none)
 
+-- SIGNALS
+
+port seatLists : Signal Model
+port seatUpdates : Signal Seat
+
+port seatRequests : Signal Seat
+port seatRequests =
+  seatRequestsBox.signal
+
+seatListsToSet : Signal Action
+seatListsToSet =
+  Signal.map SetSeats seatLists
+
+seatsToUpdate : Signal Action
+seatsToUpdate =
+  Signal.map Toggle seatUpdates
+
+incomingActions : Signal Action
+incomingActions =
+  Signal.merge seatListsToSet seatsToUpdate
+
+-- EFFECTS
+
+sendSeatRequest : Seat -> Effects Action
+sendSeatRequest seat =
+  Signal.send seatRequestsBox.address seat
+    |> Effects.task
+    |> Effects.map (always NoOp)
 
 -- VIEW
 
@@ -86,6 +104,11 @@ seatItem address seat =
   in
     li
       [ class ("seat " ++ occupiedClass)
-      , onClick address (Toggle seat)
+      , onClick address (RequestSeat seat)
       ]
       [ text (toString seat.seatNo) ]
+
+
+seatRequestsBox : Signal.Mailbox Seat
+seatRequestsBox =
+  Signal.mailbox (Seat 0 False)

@@ -11,15 +11,39 @@
 //
 // If you no longer want to use a dependency, remember
 // to also remove its path from "config.paths.watched".
-import "deps/phoenix_html/web/static/js/phoenix_html"
+import "phoenix_html"
 
 // Import local files
 //
 // Local files can be imported directly using relative
 // paths "./socket" or full ones "web/static/js/socket".
 
-// import socket from "./socket"
+import socket from "./socket"
 
 
 var elmDiv = document.getElementById('elm-main')
-  , elmApp = Elm.embed(Elm.SeatSaver, elmDiv)
+  , initalState = {
+    seatLists: [],
+    seatUpdates: {seatNo: 0, occupied: false}
+  }
+  , elmApp = Elm.embed(Elm.SeatSaver, elmDiv, initalState)
+
+let channel = socket.channel("seats:planner", {})
+
+channel.join()
+  .receive("ok", resp => { console.log("Joined successfully", resp) })
+  .receive("error", resp => { console.log("Unable to join", resp) })
+
+channel.on('set_seats', data => {
+  console.log('got seats', data.seats)
+  elmApp.ports.seatLists.send(data.seats)
+})
+
+elmApp.ports.seatRequests.subscribe(seat => {
+  channel.push("request_sent", seat).
+         receive("error", payload => console.log(payload.message))
+})
+
+channel.on("seat_updated", seat => {
+  elmApp.ports.seatUpdates.send(seat)
+})
