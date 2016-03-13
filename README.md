@@ -1,5 +1,11 @@
 # SeatSaver
 
+Following along with the [great phoenix/elm tutorial](http://www.cultivatehq.com/posts/phoenix-elm-1/).
+
+A simple application to become familiar with the [elm programing language](http://elm-lang.org/).
+
+## Install
+
 To start your Phoenix app:
 
   1. Install dependencies with `mix deps.get`
